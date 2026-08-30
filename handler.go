@@ -7,10 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"api-students/models"
+
 	"github.com/gofiber/fiber/v2"
 )
 
-var students = []Student{
+var students = []models.Student{
 	{
 		ID:        1,
 		NIM:       "240001",
@@ -62,16 +64,13 @@ func listStudents(c *fiber.Ctx) error {
 	activeFilter := c.Query("is_active")
 
 	// Filter data
-	filtered := make([]Student, 0)
+	filtered := make([]models.Student, 0)
 
 	for _, student := range students {
 
 		// Search berdasarkan nama
 		if search != "" &&
-			!strings.Contains(
-				strings.ToLower(student.Name),
-				strings.ToLower(search),
-			) {
+			!strings.Contains(strings.ToLower(student.Name), strings.ToLower(search)) {
 			continue
 		}
 
@@ -80,11 +79,7 @@ func listStudents(c *fiber.Ctx) error {
 			active, err := strconv.ParseBool(activeFilter)
 
 			if err != nil {
-				return fail(
-					c,
-					fiber.StatusBadRequest,
-					"is_active harus bernilai true atau false",
-				)
+				return fail(c, fiber.StatusBadRequest, "is_active harus bernilai true atau false")
 			}
 
 			if student.IsActive != active {
@@ -106,68 +101,41 @@ func listStudents(c *fiber.Ctx) error {
 	}
 
 	if !allowedSort[sortField] {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"field sorting tidak diperbolehkan",
-		)
+		return fail(c, fiber.StatusBadRequest, "field sorting tidak diperbolehkan")
 	}
 
 	if order != "asc" && order != "desc" {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"order harus asc atau desc",
-		)
+		return fail(c, fiber.StatusBadRequest, "order harus asc atau desc")
 	}
 
 	// Sorting
 	sort.Slice(filtered, func(i, j int) bool {
+		var result bool
+
 		switch sortField {
-
 		case "id":
-			if order == "desc" {
-				return filtered[i].ID > filtered[j].ID
-			}
-			return filtered[i].ID < filtered[j].ID
-
+			result = filtered[i].ID < filtered[j].ID
 		case "nim":
-			if order == "desc" {
-				return filtered[i].NIM > filtered[j].NIM
-			}
-			return filtered[i].NIM < filtered[j].NIM
-
+			result = filtered[i].NIM < filtered[j].NIM
 		case "name":
-			if order == "desc" {
-				return filtered[i].Name > filtered[j].Name
-			}
-			return filtered[i].Name < filtered[j].Name
-
+			result = filtered[i].Name < filtered[j].Name
 		case "grade":
-			if order == "desc" {
-				return filtered[i].Grade > filtered[j].Grade
-			}
-			return filtered[i].Grade < filtered[j].Grade
-
+			result = filtered[i].Grade < filtered[j].Grade
 		case "is_active":
-			if order == "desc" {
-				return filtered[i].IsActive && !filtered[j].IsActive
-			}
-			return !filtered[i].IsActive && filtered[j].IsActive
-
+			result = !filtered[i].IsActive && filtered[j].IsActive
 		case "created_at":
-			if order == "desc" {
-				return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
-			}
-			return filtered[i].CreatedAt.Before(filtered[j].CreatedAt)
+			result = filtered[i].CreatedAt.Before(filtered[j].CreatedAt)
 		}
 
-		return false
+		if order == "desc" {
+			return !result
+		}
+
+		return result
 	})
 
 	// Pagination
 	total := len(filtered)
-
 	totalPages := 0
 
 	if total > 0 {
@@ -178,10 +146,10 @@ func listStudents(c *fiber.Ctx) error {
 
 	if start >= total {
 		return success(c, fiber.StatusOK, struct {
-			Items []Student `json:"items"`
-			Meta  Meta      `json:"meta"`
+			Items []models.Student `json:"items"`
+			Meta  Meta             `json:"meta"`
 		}{
-			Items: []Student{},
+			Items: []models.Student{},
 			Meta: Meta{
 				Page:       page,
 				Limit:      limit,
@@ -200,8 +168,8 @@ func listStudents(c *fiber.Ctx) error {
 	result := filtered[start:end]
 
 	return success(c, fiber.StatusOK, struct {
-		Items []Student `json:"items"`
-		Meta  Meta      `json:"meta"`
+		Items []models.Student `json:"items"`
+		Meta  Meta             `json:"meta"`
 	}{
 		Items: result,
 		Meta: Meta{
@@ -218,54 +186,29 @@ func getStudent(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"ID harus berupa angka",
-		)
+		return fail(c, fiber.StatusBadRequest, "ID harus berupa angka")
 	}
 
 	for _, student := range students {
 		if student.ID == id {
-			return success(
-				c,
-				fiber.StatusOK,
-				student,
-			)
+			return success(c, fiber.StatusOK, student)
 		}
 	}
 
-	return fail(
-		c,
-		fiber.StatusNotFound,
-		"student tidak ditemukan",
-	)
+	return fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 }
 
 // POST /api/v1/students
 func createStudent(c *fiber.Ctx) error {
-	if !strings.Contains(
-		c.Get("Content-Type"),
-		"application/json",
-	) {
-		return fail(
-			c,
-			fiber.StatusUnsupportedMediaType,
-			"Content-Type harus application/json",
-		)
+
+	if !strings.Contains(c.Get("Content-Type"), "application/json") {
+		return fail(c, fiber.StatusUnsupportedMediaType, "Content-Type harus application/json")
 	}
 
-	var request CreateStudentRequest
+	var request models.CreateStudentRequest
 
-	if err := json.Unmarshal(
-		c.Body(),
-		&request,
-	); err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"JSON tidak valid",
-		)
+	if err := json.Unmarshal(c.Body(), &request); err != nil {
+		return fail(c, fiber.StatusBadRequest, "JSON tidak valid")
 	}
 
 	errors := validateStudent(
@@ -279,14 +222,10 @@ func createStudent(c *fiber.Ctx) error {
 	}
 
 	if isNIMExists(request.NIM, 0) {
-		return fail(
-			c,
-			fiber.StatusConflict,
-			"NIM sudah digunakan",
-		)
+		return fail(c, fiber.StatusConflict, "NIM sudah digunakan")
 	}
 
-	student := Student{
+	student := models.Student{
 		ID:        nextStudentID,
 		NIM:       request.NIM,
 		Name:      request.Name,
@@ -296,7 +235,6 @@ func createStudent(c *fiber.Ctx) error {
 	}
 
 	students = append(students, student)
-
 	nextStudentID++
 
 	return created(c, student)
@@ -304,49 +242,28 @@ func createStudent(c *fiber.Ctx) error {
 
 // PUT /api/v1/students/:id
 func replaceStudent(c *fiber.Ctx) error {
-	if !strings.Contains(
-		c.Get("Content-Type"),
-		"application/json",
-	) {
-		return fail(
-			c,
-			fiber.StatusUnsupportedMediaType,
-			"Content-Type harus application/json",
-		)
+
+	if !strings.Contains(c.Get("Content-Type"), "application/json") {
+		return fail(c, fiber.StatusUnsupportedMediaType, "Content-Type harus application/json")
 	}
 
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"ID harus berupa angka",
-		)
+		return fail(c, fiber.StatusBadRequest, "ID harus berupa angka")
 	}
 
 	index := findStudentIndex(id)
 
 	if index == -1 {
-		return fail(
-			c,
-			fiber.StatusNotFound,
-			"student tidak ditemukan",
-		)
+		return fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
 
 	// Cek field wajib pada PUT
 	var raw map[string]json.RawMessage
 
-	if err := json.Unmarshal(
-		c.Body(),
-		&raw,
-	); err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"JSON tidak valid",
-		)
+	if err := json.Unmarshal(c.Body(), &raw); err != nil {
+		return fail(c, fiber.StatusBadRequest, "JSON tidak valid")
 	}
 
 	requiredFields := []string{
@@ -358,26 +275,16 @@ func replaceStudent(c *fiber.Ctx) error {
 
 	for _, field := range requiredFields {
 		if _, exists := raw[field]; !exists {
-			return failValidation(
-				c,
-				map[string]string{
-					field: "field wajib dikirim",
-				},
-			)
+			return failValidation(c, map[string]string{
+				field: "field wajib dikirim",
+			})
 		}
 	}
 
-	var request ReplaceStudentRequest
+	var request models.ReplaceStudentRequest
 
-	if err := json.Unmarshal(
-		c.Body(),
-		&request,
-	); err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"JSON tidak valid",
-		)
+	if err := json.Unmarshal(c.Body(), &request); err != nil {
+		return fail(c, fiber.StatusBadRequest, "JSON tidak valid")
 	}
 
 	errors := validateStudent(
@@ -391,11 +298,7 @@ func replaceStudent(c *fiber.Ctx) error {
 	}
 
 	if isNIMExists(request.NIM, id) {
-		return fail(
-			c,
-			fiber.StatusConflict,
-			"NIM sudah digunakan",
-		)
+		return fail(c, fiber.StatusConflict, "NIM sudah digunakan")
 	}
 
 	students[index].NIM = request.NIM
@@ -403,57 +306,32 @@ func replaceStudent(c *fiber.Ctx) error {
 	students[index].Grade = request.Grade
 	students[index].IsActive = request.IsActive
 
-	return success(
-		c,
-		fiber.StatusOK,
-		students[index],
-	)
+	return success(c, fiber.StatusOK, students[index])
 }
 
 // PATCH /api/v1/students/:id
 func patchStudent(c *fiber.Ctx) error {
-	if !strings.Contains(
-		c.Get("Content-Type"),
-		"application/json",
-	) {
-		return fail(
-			c,
-			fiber.StatusUnsupportedMediaType,
-			"Content-Type harus application/json",
-		)
+
+	if !strings.Contains(c.Get("Content-Type"), "application/json") {
+		return fail(c, fiber.StatusUnsupportedMediaType, "Content-Type harus application/json")
 	}
 
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"ID harus berupa angka",
-		)
+		return fail(c, fiber.StatusBadRequest, "ID harus berupa angka")
 	}
 
 	index := findStudentIndex(id)
 
 	if index == -1 {
-		return fail(
-			c,
-			fiber.StatusNotFound,
-			"student tidak ditemukan",
-		)
+		return fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
 
-	var request PatchStudentRequest
+	var request models.PatchStudentRequest
 
-	if err := json.Unmarshal(
-		c.Body(),
-		&request,
-	); err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"JSON tidak valid",
-		)
+	if err := json.Unmarshal(c.Body(), &request); err != nil {
+		return fail(c, fiber.StatusBadRequest, "JSON tidak valid")
 	}
 
 	// Pastikan minimal ada satu field
@@ -461,59 +339,43 @@ func patchStudent(c *fiber.Ctx) error {
 		request.Name == nil &&
 		request.Grade == nil &&
 		request.IsActive == nil {
-
-		return failValidation(
-			c,
-			map[string]string{
-				"body": "minimal satu field harus dikirim",
-			},
-		)
+		return failValidation(c, map[string]string{
+			"body": "minimal satu field harus dikirim",
+		})
 	}
 
 	if request.NIM != nil {
+
 		if strings.TrimSpace(*request.NIM) == "" {
-			return failValidation(
-				c,
-				map[string]string{
-					"nim": "NIM tidak boleh kosong",
-				},
-			)
+			return failValidation(c, map[string]string{
+				"nim": "NIM tidak boleh kosong",
+			})
 		}
 
 		if isNIMExists(*request.NIM, id) {
-			return fail(
-				c,
-				fiber.StatusConflict,
-				"NIM sudah digunakan",
-			)
+			return fail(c, fiber.StatusConflict, "NIM sudah digunakan")
 		}
 
 		students[index].NIM = *request.NIM
 	}
 
 	if request.Name != nil {
+
 		if strings.TrimSpace(*request.Name) == "" {
-			return failValidation(
-				c,
-				map[string]string{
-					"name": "nama tidak boleh kosong",
-				},
-			)
+			return failValidation(c, map[string]string{
+				"name": "nama tidak boleh kosong",
+			})
 		}
 
 		students[index].Name = *request.Name
 	}
 
 	if request.Grade != nil {
-		if *request.Grade < 0 ||
-			*request.Grade > 100 {
 
-			return failValidation(
-				c,
-				map[string]string{
-					"grade": "grade harus berada di antara 0 dan 100",
-				},
-			)
+		if *request.Grade < 0 || *request.Grade > 100 {
+			return failValidation(c, map[string]string{
+				"grade": "grade harus berada di antara 0 dan 100",
+			})
 		}
 
 		students[index].Grade = *request.Grade
@@ -523,49 +385,31 @@ func patchStudent(c *fiber.Ctx) error {
 		students[index].IsActive = *request.IsActive
 	}
 
-	return success(
-		c,
-		fiber.StatusOK,
-		students[index],
-	)
+	return success(c, fiber.StatusOK, students[index])
 }
 
 // DELETE /api/v1/students/:id
 func deleteStudent(c *fiber.Ctx) error {
+
 	id, err := strconv.Atoi(c.Params("id"))
 
 	if err != nil {
-		return fail(
-			c,
-			fiber.StatusBadRequest,
-			"ID harus berupa angka",
-		)
+		return fail(c, fiber.StatusBadRequest, "ID harus berupa angka")
 	}
 
 	index := findStudentIndex(id)
 
 	if index == -1 {
-		return fail(
-			c,
-			fiber.StatusNotFound,
-			"student tidak ditemukan",
-		)
+		return fail(c, fiber.StatusNotFound, "student tidak ditemukan")
 	}
 
-	students = append(
-		students[:index],
-		students[index+1:]...,
-	)
+	students = append(students[:index], students[index+1:]...)
 
 	return noContent(c)
 }
 
 // Validasi data Student
-func validateStudent(
-	nim string,
-	name string,
-	grade float64,
-) map[string]string {
+func validateStudent(nim, name string, grade float64) map[string]string {
 
 	errors := make(map[string]string)
 
@@ -578,22 +422,18 @@ func validateStudent(
 	}
 
 	if grade < 0 || grade > 100 {
-		errors["grade"] =
-			"grade harus berada di antara 0 dan 100"
+		errors["grade"] = "grade harus berada di antara 0 dan 100"
 	}
 
 	return errors
 }
 
 // Mengecek apakah NIM sudah digunakan
-func isNIMExists(
-	nim string,
-	exceptID int,
-) bool {
+func isNIMExists(nim string, exceptID int) bool {
 
 	for _, student := range students {
-		if student.NIM == nim &&
-			student.ID != exceptID {
+
+		if student.NIM == nim && student.ID != exceptID {
 			return true
 		}
 	}
@@ -603,7 +443,9 @@ func isNIMExists(
 
 // Mencari index Student berdasarkan ID
 func findStudentIndex(id int) int {
+
 	for i, student := range students {
+
 		if student.ID == id {
 			return i
 		}

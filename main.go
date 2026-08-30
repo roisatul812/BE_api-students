@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"api-students/database"
+	"api-students/repository"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -12,20 +13,28 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var studentRepository repository.StudentRepository
+
 func main() {
 	// Memuat konfigurasi dari file .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("Peringatan: file .env tidak ditemukan")
 	}
 
-	// Membuat koneksi ke PostgreSQL
+	// Context untuk koneksi database
 	ctx := context.Background()
-	pool, err := database.Connect(ctx)
+
+	// Membuat koneksi ke PostgreSQL
+	db, err := database.Connect(ctx)
 	if err != nil {
 		log.Fatal("Gagal terhubung ke database:", err)
 	}
-	defer pool.Close()
+	defer db.Close()
 
+	// Menghubungkan repository dengan database
+	studentRepository = repository.NewPostgresStudentRepository(db)
+
+	// Membuat aplikasi Fiber
 	app := fiber.New()
 
 	// Middleware
@@ -34,7 +43,7 @@ func main() {
 
 	// Endpoint health check
 	app.Get("/health", func(c *fiber.Ctx) error {
-		if err := pool.Ping(ctx); err != nil {
+		if err := db.Ping(ctx); err != nil {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"status":   "error",
 				"database": "unavailable",

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 
+	"api-students/models"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -31,14 +33,14 @@ func success(c *fiber.Ctx, status int, data interface{}) error {
 }
 
 func created(c *fiber.Ctx, data interface{}) error {
-    student, ok := data.(Student)
-    if ok {
-        c.Location(fmt.Sprintf("/api/v1/students/%d", student.ID))
-    }
+	student, ok := data.(models.Student)
+	if ok {
+		c.Location(fmt.Sprintf("/api/v1/students/%d", student.ID))
+	}
 
-    return c.Status(fiber.StatusCreated).JSON(WebResponse{
-        Data: data,
-    })
+	return c.Status(fiber.StatusCreated).JSON(WebResponse{
+		Data: data,
+	})
 }
 
 func noContent(c *fiber.Ctx) error {
