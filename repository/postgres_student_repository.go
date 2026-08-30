@@ -52,10 +52,17 @@ func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]models.Stude
 		students = append(students, student)
 	}
 
-	return students, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return students, nil
 }
 
-func (r *PostgresStudentRepository) FindByID(ctx context.Context, id int) (*models.Student, error) {
+func (r *PostgresStudentRepository) FindByID(
+	ctx context.Context,
+	id int,
+) (*models.Student, error) {
 	query := `
 		SELECT id, nim, name, grade, is_active, created_at
 		FROM students
@@ -80,9 +87,18 @@ func (r *PostgresStudentRepository) FindByID(ctx context.Context, id int) (*mode
 	return &student, nil
 }
 
-func (r *PostgresStudentRepository) Create(ctx context.Context, student *models.Student) error {
+func (r *PostgresStudentRepository) Create(
+	ctx context.Context,
+	student *models.Student,
+) error {
 	query := `
-		INSERT INTO students (nim, name, grade, is_active, created_at)
+		INSERT INTO students (
+			nim,
+			name,
+			grade,
+			is_active,
+			created_at
+		)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`
@@ -102,10 +118,14 @@ func (r *PostgresStudentRepository) Create(ctx context.Context, student *models.
 	).Scan(&student.ID)
 }
 
-func (r *PostgresStudentRepository) Update(ctx context.Context, student *models.Student) error {
+func (r *PostgresStudentRepository) Update(
+	ctx context.Context,
+	student *models.Student,
+) error {
 	query := `
 		UPDATE students
-		SET nim = $1,
+		SET
+			nim = $1,
 			name = $2,
 			grade = $3,
 			is_active = $4
@@ -125,12 +145,16 @@ func (r *PostgresStudentRepository) Update(ctx context.Context, student *models.
 	return err
 }
 
-func (r *PostgresStudentRepository) Delete(ctx context.Context, id int) error {
+func (r *PostgresStudentRepository) Delete(
+	ctx context.Context,
+	id int,
+) error {
 	query := `
 		DELETE FROM students
 		WHERE id = $1
 	`
 
 	_, err := r.DB.Exec(ctx, query, id)
+
 	return err
 }
