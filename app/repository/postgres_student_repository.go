@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"api-students/models"
+	model "api-students/app/model"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -19,7 +19,7 @@ func NewPostgresStudentRepository(db *pgxpool.Pool) *PostgresStudentRepository {
 	}
 }
 
-func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]models.Student, error) {
+func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]model.Student, error) {
 	query := `
 		SELECT id, nim, name, grade, is_active, created_at
 		FROM students
@@ -32,10 +32,10 @@ func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]models.Stude
 	}
 	defer rows.Close()
 
-	var students []models.Student
+	var students []model.Student
 
 	for rows.Next() {
-		var student models.Student
+		var student model.Student
 
 		err := rows.Scan(
 			&student.ID,
@@ -62,14 +62,14 @@ func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]models.Stude
 func (r *PostgresStudentRepository) FindByID(
 	ctx context.Context,
 	id int,
-) (*models.Student, error) {
+) (*model.Student, error) {
 	query := `
 		SELECT id, nim, name, grade, is_active, created_at
 		FROM students
 		WHERE id = $1
 	`
 
-	var student models.Student
+	var student model.Student
 
 	err := r.DB.QueryRow(ctx, query, id).Scan(
 		&student.ID,
@@ -89,7 +89,7 @@ func (r *PostgresStudentRepository) FindByID(
 
 func (r *PostgresStudentRepository) Create(
 	ctx context.Context,
-	student *models.Student,
+	student *model.Student,
 ) error {
 	query := `
 		INSERT INTO students (
@@ -120,7 +120,7 @@ func (r *PostgresStudentRepository) Create(
 
 func (r *PostgresStudentRepository) Update(
 	ctx context.Context,
-	student *models.Student,
+	student *model.Student,
 ) error {
 	query := `
 		UPDATE students
