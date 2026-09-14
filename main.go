@@ -38,9 +38,21 @@ func main() {
 	}
 	defer db.Close()
 
+	roleRepository := repository.NewRoleRepository(db)
+
+	permissions, err := roleRepository.LoadPermissions(ctx)
+	if err != nil {
+		log.Fatalf("gagal memuat permission: %v", err)
+	}
+
+	permissionSet := helper.NewPermissionSet(permissions)
+
 	// Student dependencies
 	studentRepository := repository.NewPostgresStudentRepository(db)
-	studentService := service.NewStudentService(studentRepository)
+	studentService := service.NewStudentService(
+		studentRepository,
+		permissionSet,
+	)
 	studentHandler := handler.NewStudentHandler(studentService)
 
 	// Authentication dependencies
@@ -73,7 +85,7 @@ func main() {
 		})
 	})
 
-	route.StudentRoutes(app, studentHandler, jwtManager)
+	route.StudentRoutes(app, studentHandler, jwtManager, permissionSet)
 	route.AuthRoutes(app, authHandler, jwtManager)
 
 	log.Println("server berjalan di http://localhost:3000")

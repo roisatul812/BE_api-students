@@ -72,7 +72,7 @@ func ApplyPatch(
 		if *req.Grade < 0 || *req.Grade > 100 {
 			errs["grade"] = "grade harus berada di antara 0 dan 100"
 		} else {
-			current.Grade = *req.Grade
+			current.Grade = int(*req.Grade)
 		}
 	}
 

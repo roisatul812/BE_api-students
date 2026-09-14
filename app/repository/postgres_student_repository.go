@@ -21,7 +21,7 @@ func NewPostgresStudentRepository(db *pgxpool.Pool) *PostgresStudentRepository {
 
 func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]model.Student, error) {
 	query := `
-		SELECT id, nim, name, grade, is_active, created_at
+		SELECT id, nim, name, grade, is_active, owner_id, created_at
 		FROM students
 		ORDER BY id
 	`
@@ -43,6 +43,7 @@ func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]model.Studen
 			&student.Name,
 			&student.Grade,
 			&student.IsActive,
+			&student.OwnerID,
 			&student.CreatedAt,
 		)
 		if err != nil {
@@ -64,7 +65,7 @@ func (r *PostgresStudentRepository) FindByID(
 	id int,
 ) (*model.Student, error) {
 	query := `
-		SELECT id, nim, name, grade, is_active, created_at
+		SELECT id, nim, name, grade, is_active, owner_id,created_at
 		FROM students
 		WHERE id = $1
 	`
@@ -77,6 +78,7 @@ func (r *PostgresStudentRepository) FindByID(
 		&student.Name,
 		&student.Grade,
 		&student.IsActive,
+		&student.OwnerID,
 		&student.CreatedAt,
 	)
 
@@ -97,9 +99,10 @@ func (r *PostgresStudentRepository) Create(
 			name,
 			grade,
 			is_active,
+			owner_id,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id
 	`
 
@@ -114,6 +117,7 @@ func (r *PostgresStudentRepository) Create(
 		student.Name,
 		student.Grade,
 		student.IsActive,
+		student.OwnerID,
 		student.CreatedAt,
 	).Scan(&student.ID)
 }
