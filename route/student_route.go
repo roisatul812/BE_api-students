@@ -12,18 +12,46 @@ func StudentRoutes(
 	app *fiber.App,
 	studentHandler *handler.StudentHandler,
 	jwtManager *helper.JWTManager,
+	permissionSet *helper.PermissionSet,
 ) {
 	api := app.Group("/api/v1")
 
 	students := api.Group(
 		"/students",
 		middleware.RequireAuth(jwtManager),
+		middleware.StudentRequestLogger(),
 	)
 
-	students.Get("/", studentHandler.FindAll)
-	students.Get("/:id", studentHandler.FindByID)
-	students.Post("/", studentHandler.Create)
-	students.Put("/:id", studentHandler.Replace)
-	students.Patch("/:id", studentHandler.Patch)
-	students.Delete("/:id", studentHandler.Delete)
+	students.Get(
+		"/",
+		middleware.RequirePermission(permissionSet, "student:list"),
+		studentHandler.FindAll,
+	)
+
+	students.Get(
+		"/:id",
+		studentHandler.FindByID,
+	)
+
+	students.Post(
+		"/",
+		middleware.RequirePermission(permissionSet, "student:create"),
+		studentHandler.Create,
+	)
+
+	students.Put(
+		"/:id",
+		studentHandler.Replace,
+	)
+
+	students.Patch(
+		"/:id",
+		studentHandler.Patch,
+	)
+
+	students.Delete(
+		"/:id",
+		middleware.RequirePermission(permissionSet, "student:delete"),
+		studentHandler.Delete,
+	)
 }
