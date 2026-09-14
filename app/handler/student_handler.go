@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	model "api-students/app/model"
+	"api-students/app/model"
 	"api-students/app/service"
+	"api-students/helper"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -46,12 +47,26 @@ func (h *StudentHandler) FindByID(c *fiber.Ctx) error {
 		})
 	}
 
-	student, err := h.service.FindByID(c.Context(), id)
+	currentUser, ok := helper.CurrentUser(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "user tidak terautentikasi",
+		})
+	}
+
+	student, err := h.service.FindByID(c.Context(), id, currentUser)
 	if err != nil {
 		var notFoundErr *service.NotFoundError
 		if errors.As(err, &notFoundErr) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"message": notFoundErr.Message,
+			})
+		}
+
+		var forbiddenErr *service.ForbiddenError
+		if errors.As(err, &forbiddenErr) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"message": forbiddenErr.Message,
 			})
 		}
 
@@ -72,6 +87,13 @@ func (h *StudentHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	currentUser, ok := helper.CurrentUser(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "user tidak terautentikasi",
+		})
+	}
+
 	var req model.CreateStudentRequest
 
 	if err := c.BodyParser(&req); err != nil {
@@ -80,7 +102,11 @@ func (h *StudentHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
-	student, err := h.service.Create(c.Context(), req)
+	student, err := h.service.Create(
+		c.Context(),
+		req,
+		currentUser.UserID,
+	)
 	if err != nil {
 		return handleServiceError(c, err)
 	}
@@ -114,7 +140,15 @@ func (h *StudentHandler) Replace(c *fiber.Ctx) error {
 		})
 	}
 
-	student, err := h.service.Replace(c.Context(), id, req)
+	currentUser, ok := helper.CurrentUser(c)
+	if !ok {
+		c.Set("WWW-Authenticate", `Bearer realm="api"`)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "autentikasi diperlukan",
+		})
+	}
+
+	student, err := h.service.Replace(c.Context(), id, req, currentUser)
 	if err != nil {
 		return handleServiceError(c, err)
 	}
@@ -146,7 +180,14 @@ func (h *StudentHandler) Patch(c *fiber.Ctx) error {
 		})
 	}
 
-	student, err := h.service.Patch(c.Context(), id, req)
+	currentUser, ok := helper.CurrentUser(c)
+	if !ok {
+		c.Set("WWW-Authenticate", `Bearer realm="api"`)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "autentikasi diperlukan",
+		})
+	}
+	student, err := h.service.Patch(c.Context(), id, req, currentUser)
 	if err != nil {
 		return handleServiceError(c, err)
 	}
@@ -173,7 +214,6 @@ func (h *StudentHandler) Delete(c *fiber.Ctx) error {
 
 func isJSON(c *fiber.Ctx) bool {
 	contentType := strings.ToLower(c.Get("Content-Type"))
-
 	return strings.HasPrefix(contentType, "application/json")
 }
 
@@ -197,6 +237,13 @@ func handleServiceError(c *fiber.Ctx, err error) error {
 	if errors.As(err, &notFoundErr) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"message": notFoundErr.Message,
+		})
+	}
+
+	var forbiddenErr *service.ForbiddenError
+	if errors.As(err, &forbiddenErr) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"message": forbiddenErr.Message,
 		})
 	}
 

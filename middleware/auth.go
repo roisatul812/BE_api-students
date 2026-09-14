@@ -43,6 +43,26 @@ func RequireAuth(jwtManager *helper.JWTManager) fiber.Handler {
 	}
 }
 
+func RequirePermission(permissionSet *helper.PermissionSet, permission string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		authUser, ok := helper.CurrentUser(c)
+		if !ok {
+			c.Set("WWW-Authenticate", `Bearer realm="api"`)
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "autentikasi diperlukan",
+			})
+		}
+
+		if !permissionSet.Can(authUser.Role, permission) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"message": "tidak memiliki permission",
+			})
+		}
+
+		return c.Next()
+	}
+}
+
 func bearerToken(c *fiber.Ctx) (string, error) {
 	header := c.Get(fiber.HeaderAuthorization)
 

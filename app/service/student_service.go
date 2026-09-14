@@ -6,17 +6,23 @@ import (
 
 	model "api-students/app/model"
 	"api-students/app/repository"
+	"api-students/helper"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type StudentService struct {
-	repository repository.StudentRepository
+	repository    repository.StudentRepository
+	permissionSet *helper.PermissionSet
 }
 
-func NewStudentService(repo repository.StudentRepository) *StudentService {
+func NewStudentService(
+	repo repository.StudentRepository,
+	permissionSet *helper.PermissionSet,
+) *StudentService {
 	return &StudentService{
-		repository: repo,
+		repository:    repo,
+		permissionSet: permissionSet,
 	}
 }
 
@@ -24,17 +30,30 @@ func (s *StudentService) FindAll(ctx context.Context) ([]model.Student, error) {
 	return s.repository.FindAll(ctx)
 }
 
-func (s *StudentService) FindByID(ctx context.Context, id int) (*model.Student, error) {
+func (s *StudentService) FindByID(
+	ctx context.Context,
+	id int,
+	currentUser model.AuthUser,
+) (*model.Student, error) {
 	student, err := s.repository.FindByID(ctx, id)
-
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &NotFoundError{
 				Message: "student tidak ditemukan",
 			}
 		}
-
 		return nil, err
+	}
+
+	if !CanAccessStudent(
+		currentUser,
+		student.OwnerID,
+		s.permissionSet,
+		"student:read:any",
+	) {
+		return nil, &ForbiddenError{
+			Message: "tidak memiliki akses ke student ini",
+		}
 	}
 
 	return student, nil
@@ -43,6 +62,7 @@ func (s *StudentService) FindByID(ctx context.Context, id int) (*model.Student, 
 func (s *StudentService) Create(
 	ctx context.Context,
 	req model.CreateStudentRequest,
+	ownerID int,
 ) (*model.Student, error) {
 
 	errs := ValidateCreate(req)
@@ -70,8 +90,9 @@ func (s *StudentService) Create(
 	student := &model.Student{
 		NIM:      req.NIM,
 		Name:     req.Name,
-		Grade:    req.Grade,
+		Grade:    int(req.Grade),
 		IsActive: req.IsActive,
+		OwnerID:  ownerID,
 	}
 
 	if err := s.repository.Create(ctx, student); err != nil {
@@ -85,9 +106,13 @@ func (s *StudentService) Replace(
 	ctx context.Context,
 	id int,
 	req model.ReplaceStudentRequest,
+	currentUser model.AuthUser,
 ) (*model.Student, error) {
-
 	current, err := s.repository.FindByID(ctx, id)
+
+	if !CanAccessStudent(currentUser, current.OwnerID, s.permissionSet, "student:update:any") {
+		return nil, &ForbiddenError{Message: "tidak memiliki akses untuk mengubah student ini"}
+	}
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -123,7 +148,7 @@ func (s *StudentService) Replace(
 
 	current.NIM = req.NIM
 	current.Name = req.Name
-	current.Grade = req.Grade
+	current.Grade = int(req.Grade)
 	current.IsActive = req.IsActive
 
 	if err := s.repository.Update(ctx, current); err != nil {
@@ -137,10 +162,14 @@ func (s *StudentService) Patch(
 	ctx context.Context,
 	id int,
 	req model.PatchStudentRequest,
+	currentUser model.AuthUser,
 ) (*model.Student, error) {
 
 	current, err := s.repository.FindByID(ctx, id)
 
+	if !CanAccessStudent(currentUser, current.OwnerID, s.permissionSet, "student:update:any") {
+		return nil, &ForbiddenError{Message: "tidak memiliki akses untuk mengubah student ini"}
+	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &NotFoundError{
@@ -227,5 +256,13 @@ type NotFoundError struct {
 }
 
 func (e *NotFoundError) Error() string {
+	return e.Message
+}
+
+type ForbiddenError struct {
+	Message string
+}
+
+func (e *ForbiddenError) Error() string {
 	return e.Message
 }
