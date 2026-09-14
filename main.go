@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"api-students/app/handler"
 	"api-students/app/repository"
 	"api-students/app/service"
+	"api-students/config"
 	"api-students/database"
+	"api-students/helper"
 	"api-students/route"
 
 	"github.com/gofiber/fiber/v2"
@@ -18,20 +21,46 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("Peringatan: file .env tidak ditemukan")
+		log.Println("file .env tidak ditemukan, menggunakan environment variable")
+	}
+
+	authConfig := config.LoadAuthConfig()
+
+	if authConfig.JWTSecret == "" {
+		log.Fatal("JWT_SECRET wajib diisi")
 	}
 
 	ctx := context.Background()
 
 	db, err := database.Connect(ctx)
 	if err != nil {
-		log.Fatal("Gagal terhubung ke database:", err)
+		log.Fatal(err)
 	}
 	defer db.Close()
 
+	// Student dependencies
 	studentRepository := repository.NewPostgresStudentRepository(db)
 	studentService := service.NewStudentService(studentRepository)
 	studentHandler := handler.NewStudentHandler(studentService)
+
+	// Authentication dependencies
+	userRepository := repository.NewUserRepository(db)
+	tokenRepository := repository.NewTokenRepository(db)
+
+	jwtManager := helper.NewJWTManager(
+		authConfig.JWTSecret,
+		authConfig.JWTIssuer,
+		authConfig.JWTAccessTTL,
+	)
+
+	authService := service.NewAuthService(
+		userRepository,
+		tokenRepository,
+		jwtManager,
+		authConfig.JWTRefreshTTL,
+	)
+
+	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New()
 
@@ -39,22 +68,20 @@ func main() {
 	app.Use(logger.New())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
-		if err := db.Ping(ctx); err != nil {
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-				"status":   "error",
-				"database": "unavailable",
-			})
-		}
-
 		return c.JSON(fiber.Map{
-			"status":   "ok",
-			"database": "connected",
+			"status": "ok",
 		})
 	})
 
-	route.StudentRoutes(app, studentHandler)
+	route.StudentRoutes(app, studentHandler, jwtManager)
+	route.AuthRoutes(app, authHandler, jwtManager)
 
-	log.Println("Server berjalan di http://localhost:3000")
+	log.Println("server berjalan di http://localhost:3000")
 
-	log.Fatal(app.Listen(":3000"))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+
+	log.Fatal(app.Listen(":" + port))
 }
