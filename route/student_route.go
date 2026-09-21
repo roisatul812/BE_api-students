@@ -11,6 +11,7 @@ import (
 func StudentRoutes(
 	app *fiber.App,
 	studentHandler *handler.StudentHandler,
+	prestasiHandler *handler.PrestasiHandler,
 	jwtManager *helper.JWTManager,
 	permissionSet *helper.PermissionSet,
 ) {
@@ -31,6 +32,11 @@ func StudentRoutes(
 	students.Get(
 		"/:id",
 		studentHandler.FindByID,
+	)
+
+	students.Get(
+		"/:nim/prestasi",
+		prestasiHandler.FindByNIM,
 	)
 
 	students.Post(

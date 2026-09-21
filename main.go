@@ -38,6 +38,7 @@ func main() {
 	}
 	defer db.Close()
 
+	// Permission dependencies
 	roleRepository := repository.NewRoleRepository(db)
 
 	permissions, err := roleRepository.LoadPermissions(ctx)
@@ -49,11 +50,22 @@ func main() {
 
 	// Student dependencies
 	studentRepository := repository.NewPostgresStudentRepository(db)
+
 	studentService := service.NewStudentService(
 		studentRepository,
 		permissionSet,
 	)
+
 	studentHandler := handler.NewStudentHandler(studentService)
+
+	// Prestasi dependencies
+	prestasiRepository := repository.NewPrestasiRepository(db)
+
+	prestasiService := service.NewPrestasiService(
+		prestasiRepository,
+	)
+
+	prestasiHandler := handler.NewPrestasiHandler(prestasiService)
 
 	// Authentication dependencies
 	userRepository := repository.NewUserRepository(db)
@@ -74,6 +86,7 @@ func main() {
 
 	authHandler := handler.NewAuthHandler(authService)
 
+	// Fiber
 	app := fiber.New()
 
 	app.Use(requestid.New())
@@ -85,8 +98,20 @@ func main() {
 		})
 	})
 
-	route.StudentRoutes(app, studentHandler, jwtManager, permissionSet)
-	route.AuthRoutes(app, authHandler, jwtManager)
+	// Routes
+	route.AuthRoutes(
+		app,
+		authHandler,
+		jwtManager,
+	)
+
+	route.StudentRoutes(
+		app,
+		studentHandler,
+		prestasiHandler,
+		jwtManager,
+		permissionSet,
+	)
 
 	log.Println("server berjalan di http://localhost:3000")
 
