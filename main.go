@@ -106,6 +106,11 @@ func main() {
 		})
 	})
 
+	// Course & KRS dependencies
+	courseRepository := repository.NewCourseRepository(db)
+	txManager := repository.NewTxManager(db)
+	courseService := service.NewCourseService(courseRepository, txManager)
+
 	// Routes
 	route.AuthRoutes(
 		app,
@@ -117,6 +122,13 @@ func main() {
 		app,
 		studentHandler,
 		prestasiHandler,
+		jwtManager,
+		permissionSet,
+	)
+
+	route.CourseRoutes(
+		app,
+		courseService,
 		jwtManager,
 		permissionSet,
 	)

@@ -49,6 +49,12 @@ func (e *AppError) Error() string {
 // untuk menemukan error asli di bawahnya.
 func (e *AppError) Unwrap() error { return e.cause }
 
+// NewError dipakai bila sebuah kegagalan butuh kode yang lebih spesifik
+// daripada kode umum di atas — misalnya COURSE_FULL alih-alih CONFLICT.
+func NewError(status int, code, message string) *AppError {
+	return &AppError{Status: status, Code: code, Message: message}
+}
+
 func BadRequest(message string) *AppError {
 	return &AppError{Status: fiber.StatusBadRequest, Code: CodeBadRequest, Message: message}
 }
