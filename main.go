@@ -66,6 +66,12 @@ func main() {
 		log.Fatalf("gagal membuat index MongoDB: %v", err)
 	}
 
+	portfolioRepository := repository.NewPortfolioRepository(mongoDB)
+	if err := portfolioRepository.EnsureIndexes(ctx); err != nil {
+		slogger.Error("gagal membuat index portfolio MongoDB", slog.String("error", err.Error()))
+		log.Fatalf("gagal membuat index portfolio MongoDB: %v", err)
+	}
+
 	// Permission dependencies
 	roleRepository := repository.NewRoleRepository(db)
 
@@ -151,6 +157,9 @@ func main() {
 	// Review dependencies
 	reviewService := service.NewReviewService(reviewRepository, courseRepository, permissionSet)
 
+	// Portfolio dependencies
+	portfolioService := service.NewPortfolioService(portfolioRepository, studentRepository, permissionSet)
+
 	// Routes
 	route.AuthRoutes(
 		app,
@@ -183,6 +192,12 @@ func main() {
 	route.ReviewRoutes(
 		app,
 		reviewService,
+		jwtManager,
+	)
+
+	route.PortfolioRoutes(
+		app,
+		portfolioService,
 		jwtManager,
 	)
 
