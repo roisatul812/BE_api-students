@@ -4,7 +4,10 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"api-students/app/handler"
@@ -130,7 +133,7 @@ func main() {
 	app.Use(logger.New())
 
 	// Health check memeriksa ketersediaan PostgreSQL dan MongoDB
-	app.Get("/health", func(c *fiber.Ctx) error {
+	healthCheckHandler := func(c *fiber.Ctx) error {
 		hCtx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
 		defer cancel()
 
@@ -143,7 +146,9 @@ func main() {
 		}
 
 		return helper.Success(c, fiber.StatusOK, "server, PostgreSQL, dan MongoDB berjalan", nil)
-	})
+	}
+	app.Get("/health", healthCheckHandler)
+	app.Get("/api/v1/health", healthCheckHandler)
 
 	// Course & KRS dependencies
 	courseRepository := repository.NewCourseRepository(db)
@@ -206,12 +211,25 @@ func main() {
 		return helper.NotFound("endpoint tidak ditemukan")
 	})
 
-	log.Println("server berjalan di http://localhost:3000")
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
-	log.Fatal(app.Listen(":" + port))
+	// Graceful shutdown: tangkap SIGINT dan SIGTERM
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		slogger.Info("menerima sinyal penutupan, menghentikan server Fiber secara anggun...")
+		if err := app.ShutdownWithTimeout(5 * time.Second); err != nil {
+			slogger.Error("gagal mematikan server Fiber secara anggun", slog.String("error", err.Error()))
+		}
+	}()
+
+	log.Printf("server berjalan di http://localhost:%s", port)
+	if err := app.Listen(":" + port); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("server berhenti dengan error: %v", err)
+	}
 }

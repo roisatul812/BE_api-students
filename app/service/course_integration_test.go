@@ -134,19 +134,13 @@ func TestCourseHTTP_Functional(t *testing.T) {
 	_ = env.db.QueryRow(ctx, "SELECT id FROM courses WHERE code = 'IF309'").Scan(&idFull)
 
 	// Reset hanya pendaftaran untuk studentID dan courses ini
-	_, _ = env.db.Exec(ctx, `
-		DELETE FROM enrollments WHERE user_id = $1 OR course_id IN ($2, $3, $4);
-		UPDATE courses SET enrolled_count = (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = courses.id)
-		WHERE id IN ($2, $3, $4);
-	`, studentID, idSource, idTarget, idFull)
+	resetTestData := func() {
+		_, _ = env.db.Exec(ctx, "DELETE FROM enrollments WHERE user_id = $1 OR course_id IN ($2, $3, $4)", studentID, idSource, idTarget, idFull)
+		_, _ = env.db.Exec(ctx, "UPDATE courses SET enrolled_count = (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = courses.id) WHERE id IN ($1, $2, $3)", idSource, idTarget, idFull)
+	}
 
-	defer func() {
-		_, _ = env.db.Exec(ctx, `
-			DELETE FROM enrollments WHERE user_id = $1 OR course_id IN ($2, $3, $4);
-			UPDATE courses SET enrolled_count = (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = courses.id)
-			WHERE id IN ($2, $3, $4);
-		`, studentID, idSource, idTarget, idFull)
-	}()
+	resetTestData()
+	defer resetTestData()
 
 	// 1. GET /courses (list courses)
 	t.Run("GET /courses - Success", func(t *testing.T) {
