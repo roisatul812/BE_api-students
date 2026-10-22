@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"time"
 
 	"api-students/app/handler"
 	"api-students/app/repository"
@@ -34,11 +35,32 @@ func main() {
 
 	ctx := context.Background()
 
+	// Logger terpusat
+	slogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	// PostgreSQL connection
 	db, err := database.Connect(ctx)
 	if err != nil {
+		slogger.Error("gagal terhubung ke PostgreSQL", slog.String("error", err.Error()))
 		log.Fatal(err)
 	}
 	defer db.Close()
+
+	// MongoDB v2 connection
+	mongoCfg := database.LoadMongoConfig()
+	mongoClient, err := database.ConnectMongo(ctx, mongoCfg)
+	if err != nil {
+		slogger.Error("gagal terhubung ke MongoDB", slog.String("error", err.Error()))
+		log.Fatalf("MongoDB wajib tersedia untuk Modul 10: %v", err)
+	}
+	defer func() {
+		if err := database.DisconnectMongo(mongoClient, 5*time.Second); err != nil {
+			slogger.Warn("gagal menutup koneksi MongoDB secara anggun", slog.String("error", err.Error()))
+		}
+	}()
+
+	mongoDB := database.GetMongoDatabase(mongoClient, mongoCfg.DatabaseName)
+	_ = mongoDB
 
 	// Permission dependencies
 	roleRepository := repository.NewRoleRepository(db)
@@ -88,9 +110,6 @@ func main() {
 
 	authHandler := handler.NewAuthHandler(authService)
 
-	// Logger untuk error handler
-	slogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
 	// Fiber
 	app := fiber.New(fiber.Config{
 		ErrorHandler: config.NewErrorHandler(slogger),
@@ -100,10 +119,20 @@ func main() {
 	app.Use(middleware.RequestLogger(slogger))
 	app.Use(logger.New())
 
+	// Health check memeriksa ketersediaan PostgreSQL dan MongoDB
 	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status": "ok",
-		})
+		hCtx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
+		defer cancel()
+
+		if err := db.Ping(hCtx); err != nil {
+			return helper.ServiceUnavailable("PostgreSQL tidak dapat dihubungi")
+		}
+
+		if err := mongoClient.Ping(hCtx, nil); err != nil {
+			return helper.ServiceUnavailable("MongoDB tidak dapat dihubungi")
+		}
+
+		return helper.Success(c, fiber.StatusOK, "server, PostgreSQL, dan MongoDB berjalan", nil)
 	})
 
 	// Course & KRS dependencies

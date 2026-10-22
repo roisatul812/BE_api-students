@@ -230,18 +230,18 @@ func TestHTTP_Supervisor_Switch_Success(t *testing.T) {
 
 	adminToken := createTestToken(t, env.jwtManager, 1, "admin", "admin")
 
-	// Assign ke Supervisor 1
+	// Assign ke Supervisor 3
 	assignBody, _ := json.Marshal(model.AssignSupervisorRequest{StudentID: studentID})
-	reqAssign := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/1/assign", bytes.NewReader(assignBody))
+	reqAssign := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/3/assign", bytes.NewReader(assignBody))
 	reqAssign.Header.Set("Content-Type", "application/json")
 	reqAssign.Header.Set("Authorization", "Bearer "+adminToken)
 	respA, _ := env.app.Test(reqAssign)
 	respA.Body.Close()
 
-	// Switch ke Supervisor 2
+	// Switch ke Supervisor 4
 	switchBody, _ := json.Marshal(model.SwitchSupervisorRequest{
 		StudentID:      studentID,
-		ToSupervisorID: 2,
+		ToSupervisorID: 4,
 	})
 	reqSwitch := httptest.NewRequest(http.MethodPost, "/api/v1/supervisions/switch", bytes.NewReader(switchBody))
 	reqSwitch.Header.Set("Content-Type", "application/json")
