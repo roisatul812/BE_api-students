@@ -14,11 +14,6 @@ type WebResponse struct {
 	Meta    interface{} `json:"meta,omitempty"`
 }
 
-type ErrorResponse struct {
-	Message *string     `json:"message"`
-	Errors  interface{} `json:"errors,omitempty"`
-}
-
 func Success(c *fiber.Ctx, status int, data interface{}) error {
 	return c.Status(status).JSON(WebResponse{
 		Data: data,
@@ -39,19 +34,4 @@ func Created(c *fiber.Ctx, data interface{}) error {
 
 func NoContent(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
-}
-
-func Fail(c *fiber.Ctx, status int, message string) error {
-	return c.Status(status).JSON(ErrorResponse{
-		Message: &message,
-	})
-}
-
-func FailValidation(c *fiber.Ctx, errors map[string]string) error {
-	message := "validasi gagal"
-
-	return c.Status(fiber.StatusUnprocessableEntity).JSON(ErrorResponse{
-		Message: &message,
-		Errors:  errors,
-	})
 }

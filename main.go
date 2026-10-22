@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 
 	"api-students/app/handler"
@@ -11,6 +12,7 @@ import (
 	"api-students/config"
 	"api-students/database"
 	"api-students/helper"
+	"api-students/middleware"
 	"api-students/route"
 
 	"github.com/gofiber/fiber/v2"
@@ -86,10 +88,16 @@ func main() {
 
 	authHandler := handler.NewAuthHandler(authService)
 
+	// Logger untuk error handler
+	slogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
 	// Fiber
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		ErrorHandler: config.NewErrorHandler(slogger),
+	})
 
 	app.Use(requestid.New())
+	app.Use(middleware.RequestLogger(slogger))
 	app.Use(logger.New())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -112,6 +120,11 @@ func main() {
 		jwtManager,
 		permissionSet,
 	)
+
+	// Route tidak ditemukan (404) akan diteruskan ke ErrorHandler
+	app.Use(func(c *fiber.Ctx) error {
+		return helper.NotFound("endpoint tidak ditemukan")
+	})
 
 	log.Println("server berjalan di http://localhost:3000")
 

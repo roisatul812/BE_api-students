@@ -5,7 +5,9 @@ import (
 	"time"
 
 	model "api-students/app/model"
+	"api-students/helper"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -59,6 +61,81 @@ func (r *PostgresStudentRepository) FindAll(ctx context.Context) ([]model.Studen
 
 	return students, nil
 }
+
+// FindByCursor mengimplementasikan keyset/cursor pagination (Modul 7 Langkah 7).
+// PERBAIKAN BUG #8:
+// Menggunakan ORDER BY created_at DESC, id DESC secara stabil dan konsisten dengan keyset (created_at, id) < ($1, $2).
+func (r *PostgresStudentRepository) FindByCursor(ctx context.Context, cursor *model.CursorParam, limit int) ([]model.Student, bool, string, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	fetchLimit := limit + 1
+	var rows pgx.Rows
+	var err error
+
+	if cursor == nil {
+		query := `
+			SELECT id, nim, name, grade, is_active, owner_id, created_at
+			FROM students
+			ORDER BY created_at DESC, id DESC
+			LIMIT $1
+		`
+		rows, err = r.DB.Query(ctx, query, fetchLimit)
+	} else {
+		query := `
+			SELECT id, nim, name, grade, is_active, owner_id, created_at
+			FROM students
+			WHERE (created_at, id) < ($1, $2)
+			ORDER BY created_at DESC, id DESC
+			LIMIT $3
+		`
+		rows, err = r.DB.Query(ctx, query, cursor.CreatedAt, cursor.ID, fetchLimit)
+	}
+	if err != nil {
+		return nil, false, "", err
+	}
+	defer rows.Close()
+
+	var students []model.Student
+	for rows.Next() {
+		var student model.Student
+		if err := rows.Scan(
+			&student.ID,
+			&student.NIM,
+			&student.Name,
+			&student.Grade,
+			&student.IsActive,
+			&student.OwnerID,
+			&student.CreatedAt,
+		); err != nil {
+			return nil, false, "", err
+		}
+		students = append(students, student)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, false, "", err
+	}
+
+	hasMore := len(students) > limit
+	var nextCursor string
+	if hasMore {
+		students = students[:limit]
+		last := students[limit-1]
+		nextCursor = helper.EncodeCursor(last.CreatedAt, last.ID)
+	}
+
+	if students == nil {
+		students = []model.Student{}
+	}
+
+	return students, hasMore, nextCursor, nil
+}
+
 
 func (r *PostgresStudentRepository) FindByID(
 	ctx context.Context,

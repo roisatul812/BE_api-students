@@ -33,7 +33,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	if err != nil {
 		var validationErr *service.ValidationError
 		if errors.As(err, &validationErr) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
 				"message": "validasi gagal",
 				"errors":  validationErr.Errors,
 			})

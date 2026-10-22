@@ -43,7 +43,7 @@ func (s *AuthService) Register(
 	req.Username = strings.TrimSpace(req.Username)
 	req.Email = strings.TrimSpace(req.Email)
 
-	if errs := ValidateRegister(req); len(errs) > 0 {
+	if errs := helper.ValidateStruct(req); len(errs) > 0 {
 		return nil, &ValidationError{Errors: errs}
 	}
 
@@ -90,7 +90,7 @@ func (s *AuthService) Login(
 ) (*model.TokenPair, error) {
 	req.Username = strings.TrimSpace(req.Username)
 
-	if errs := ValidateLogin(req); len(errs) > 0 {
+	if errs := helper.ValidateStruct(req); len(errs) > 0 {
 		return nil, &ValidationError{Errors: errs}
 	}
 

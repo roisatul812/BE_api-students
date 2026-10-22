@@ -61,3 +61,4 @@ func StudentRoutes(
 		studentHandler.Delete,
 	)
 }
+

@@ -8,6 +8,7 @@ import (
 
 type StudentRepository interface {
 	FindAll(ctx context.Context) ([]model.Student, error)
+	FindByCursor(ctx context.Context, cursor *model.CursorParam, limit int) ([]model.Student, bool, string, error)
 	FindByID(ctx context.Context, id int) (*model.Student, error)
 	Create(ctx context.Context, student *model.Student) error
 	Update(ctx context.Context, student *model.Student) error

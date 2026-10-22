@@ -16,10 +16,7 @@ func RequireAuth(jwtManager *helper.JWTManager) fiber.Handler {
 		token, err := bearerToken(c)
 		if err != nil {
 			c.Set("WWW-Authenticate", `Bearer realm="api"`)
-
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "header Authorization tidak ada atau salah bentuk",
-			})
+			return helper.Unauthorized("header Authorization tidak ada atau salah bentuk")
 		}
 
 		authUser, err := jwtManager.Parse(token)
@@ -27,14 +24,10 @@ func RequireAuth(jwtManager *helper.JWTManager) fiber.Handler {
 			c.Set("WWW-Authenticate", `Bearer realm="api"`)
 
 			if errors.Is(err, helper.ErrExpiredToken) {
-				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-					"message": "access token kedaluwarsa",
-				})
+				return helper.Unauthorized("access token kedaluwarsa")
 			}
 
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "access token tidak valid",
-			})
+			return helper.Unauthorized("access token tidak valid")
 		}
 
 		c.Locals(helper.LocalsAuthUser, authUser)
@@ -48,15 +41,11 @@ func RequirePermission(permissionSet *helper.PermissionSet, permission string) f
 		authUser, ok := helper.CurrentUser(c)
 		if !ok {
 			c.Set("WWW-Authenticate", `Bearer realm="api"`)
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "autentikasi diperlukan",
-			})
+			return helper.Unauthorized("autentikasi diperlukan")
 		}
 
 		if !permissionSet.Can(authUser.Role, permission) {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"message": "tidak memiliki permission",
-			})
+			return helper.Forbidden("tidak memiliki permission")
 		}
 
 		return c.Next()
