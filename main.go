@@ -111,6 +111,10 @@ func main() {
 	txManager := repository.NewTxManager(db)
 	courseService := service.NewCourseService(courseRepository, txManager)
 
+	// Supervisor & Tugas Akhir dependencies
+	supervisorRepository := repository.NewSupervisorRepository(db)
+	supervisorService := service.NewSupervisorService(supervisorRepository, txManager)
+
 	// Routes
 	route.AuthRoutes(
 		app,
@@ -129,6 +133,13 @@ func main() {
 	route.CourseRoutes(
 		app,
 		courseService,
+		jwtManager,
+		permissionSet,
+	)
+
+	route.SupervisorRoutes(
+		app,
+		supervisorService,
 		jwtManager,
 		permissionSet,
 	)
