@@ -13,13 +13,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// resetSupervisorTestData membersihkan data supervisions dan mereset supervised_count ke 0.
+// resetSupervisorTestData membersihkan data supervisions mahasiswa uji dan mereset supervised_count.
 func resetSupervisorTestData(t *testing.T, db *pgxpool.Pool) {
 	ctx := context.Background()
 	_, err := db.Exec(ctx, `
-		DELETE FROM supervisions;
+		DELETE FROM supervisions WHERE student_id IN (SELECT id FROM students WHERE nim LIKE 'MHS_SPV_%');
 		UPDATE supervisors
-		SET supervised_count = 0, version = 1;
+		SET supervised_count = (SELECT COUNT(*) FROM supervisions WHERE supervisor_id = supervisors.id),
+		    version = 1
+		WHERE id IN (1, 2, 5);
 	`)
 	if err != nil {
 		t.Fatalf("gagal reset data supervisor: %v", err)

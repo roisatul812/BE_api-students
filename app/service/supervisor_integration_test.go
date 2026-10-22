@@ -68,9 +68,11 @@ func setupSupervisorTestApp(t *testing.T) *supervisorTestEnv {
 func resetSupervisorTestDataInService(t *testing.T, db *pgxpool.Pool) {
 	ctx := context.Background()
 	_, err := db.Exec(ctx, `
-		DELETE FROM supervisions;
+		DELETE FROM supervisions WHERE student_id IN (SELECT id FROM students WHERE nim LIKE 'MHS_INT_%');
 		UPDATE supervisors
-		SET supervised_count = 0, version = 1;
+		SET supervised_count = (SELECT COUNT(*) FROM supervisions WHERE supervisor_id = supervisors.id),
+		    version = 1
+		WHERE id IN (3, 4);
 	`)
 	if err != nil {
 		t.Fatalf("gagal reset data supervisor: %v", err)
@@ -135,7 +137,7 @@ func TestHTTP_Supervisor_Assign_Success(t *testing.T) {
 		StudentID: studentID,
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/1/assign", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/3/assign", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 
@@ -166,7 +168,7 @@ func TestHTTP_Supervisor_Assign_Forbidden_WithoutPermission(t *testing.T) {
 		StudentID: studentID,
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/1/assign", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/3/assign", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+userToken)
 
@@ -196,14 +198,14 @@ func TestHTTP_Supervisor_Assign_AlreadySupervised(t *testing.T) {
 	})
 
 	// Assign pertama
-	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/1/assign", bytes.NewReader(body))
+	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/3/assign", bytes.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
 	req1.Header.Set("Authorization", "Bearer "+adminToken)
 	resp1, _ := env.app.Test(req1)
 	resp1.Body.Close()
 
 	// Assign kedua untuk mahasiswa yang sama
-	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/2/assign", bytes.NewReader(body))
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/4/assign", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("Authorization", "Bearer "+adminToken)
 	resp2, _ := env.app.Test(req2)
@@ -271,7 +273,7 @@ func TestHTTP_Supervisor_UpdateQuota_OptimisticLocking(t *testing.T) {
 		Quota:   8,
 		Version: 1,
 	})
-	reqValid := httptest.NewRequest(http.MethodPatch, "/api/v1/supervisors/1", bytes.NewReader(bodyValid))
+	reqValid := httptest.NewRequest(http.MethodPatch, "/api/v1/supervisors/3", bytes.NewReader(bodyValid))
 	reqValid.Header.Set("Content-Type", "application/json")
 	reqValid.Header.Set("Authorization", "Bearer "+adminToken)
 
@@ -291,7 +293,7 @@ func TestHTTP_Supervisor_UpdateQuota_OptimisticLocking(t *testing.T) {
 		Quota:   10,
 		Version: 1,
 	})
-	reqStale := httptest.NewRequest(http.MethodPatch, "/api/v1/supervisors/1", bytes.NewReader(bodyStale))
+	reqStale := httptest.NewRequest(http.MethodPatch, "/api/v1/supervisors/3", bytes.NewReader(bodyStale))
 	reqStale.Header.Set("Content-Type", "application/json")
 	reqStale.Header.Set("Authorization", "Bearer "+adminToken)
 
@@ -320,10 +322,10 @@ func TestHTTP_Supervisor_UpdateQuota_BelowSupervised(t *testing.T) {
 	studentIDs := ensureServiceTestStudents(t, env.db, 2)
 	adminToken := createTestToken(t, env.jwtManager, 1, "admin", "admin")
 
-	// Assign 2 mahasiswa ke supervisor 1
+	// Assign 2 mahasiswa ke supervisor 3
 	for _, sid := range studentIDs {
 		assignBody, _ := json.Marshal(model.AssignSupervisorRequest{StudentID: sid})
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/1/assign", bytes.NewReader(assignBody))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/supervisors/3/assign", bytes.NewReader(assignBody))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+adminToken)
 		r, _ := env.app.Test(req)
@@ -335,7 +337,7 @@ func TestHTTP_Supervisor_UpdateQuota_BelowSupervised(t *testing.T) {
 		Quota:   1,
 		Version: 1,
 	})
-	reqPatch := httptest.NewRequest(http.MethodPatch, "/api/v1/supervisors/1", bytes.NewReader(patchBody))
+	reqPatch := httptest.NewRequest(http.MethodPatch, "/api/v1/supervisors/3", bytes.NewReader(patchBody))
 	reqPatch.Header.Set("Content-Type", "application/json")
 	reqPatch.Header.Set("Authorization", "Bearer "+adminToken)
 

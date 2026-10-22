@@ -60,7 +60,11 @@ func main() {
 	}()
 
 	mongoDB := database.GetMongoDatabase(mongoClient, mongoCfg.DatabaseName)
-	_ = mongoDB
+	reviewRepository := repository.NewReviewRepository(mongoDB)
+	if err := reviewRepository.EnsureIndexes(ctx); err != nil {
+		slogger.Error("gagal membuat index MongoDB", slog.String("error", err.Error()))
+		log.Fatalf("gagal membuat index MongoDB: %v", err)
+	}
 
 	// Permission dependencies
 	roleRepository := repository.NewRoleRepository(db)
@@ -144,6 +148,9 @@ func main() {
 	supervisorRepository := repository.NewSupervisorRepository(db)
 	supervisorService := service.NewSupervisorService(supervisorRepository, txManager)
 
+	// Review dependencies
+	reviewService := service.NewReviewService(reviewRepository, courseRepository, permissionSet)
+
 	// Routes
 	route.AuthRoutes(
 		app,
@@ -171,6 +178,12 @@ func main() {
 		supervisorService,
 		jwtManager,
 		permissionSet,
+	)
+
+	route.ReviewRoutes(
+		app,
+		reviewService,
+		jwtManager,
 	)
 
 	// Route tidak ditemukan (404) akan diteruskan ke ErrorHandler
